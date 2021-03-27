@@ -38,7 +38,7 @@ class CompoundCommand(Command):
             self.register_comp()
             self.write_file()
         else:
-
+            self.search_comp()
 
     def load_file(self):
         """Load json file"""
@@ -73,12 +73,24 @@ class CompoundCommand(Command):
 
         # Compound does not exist, so store it
         if registered_state is None:
-            self.compounds[self._args.id] = {'state': 'registered', 'wells': set()}
+            self.compounds[self._args.id] = {'state': 'registered', 'plate.well': []}
         # Give error if compound already registered
         elif registered_state:
             logging.error(f'Compound {self._args.id} is already registered')
         else:
             self.compounds[self._args.id] = {'state': 'registered'}
+
+    def search_comp(self):
+        """Search for a compound - gives id, state (stored, registered),
+        and all plates.wells associated with it"""
+        if self.is_registered() == None:
+            print(f'Compound {self._args.id} does not exist')
+        else:
+            results = self.compounds[self._args.id]
+            print(f'id: {self._args.id}')
+            print(f'state: {results["state"]}')
+            if results["plate.well"]:
+                print(f'plates: {results["plate.well"]}')
 
     def is_registered(self):
         """Check state of compound - is it registered already?"""
