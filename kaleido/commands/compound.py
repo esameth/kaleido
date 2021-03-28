@@ -71,14 +71,11 @@ class CompoundCommand(Command):
         # Get state: registered, stored, or does not exist
         registered_state = self.is_registered()
 
-        # Compound does not exist, so store it
-        if registered_state is None:
-            self.compounds[self._args.id] = {'state': 'registered', 'plate.well': []}
         # Give error if compound already registered
-        elif registered_state:
+        if registered_state:
             logging.error(f'Compound {self._args.id} is already registered')
         else:
-            self.compounds[self._args.id] = {'state': 'registered'}
+            self.compounds[self._args.id] = {'state': 'registered', 'plate.well': []}
 
     def search_comp(self):
         """Search for a compound - gives id, state (stored, registered),
@@ -89,8 +86,9 @@ class CompoundCommand(Command):
             results = self.compounds[self._args.id]
             print(f'id: {self._args.id}')
             print(f'state: {results["state"]}')
-            if results["plate.well"]:
-                print(f'plates: {results["plate.well"]}')
+            if results["state"] == "registered":
+                if results["plate.well"]:
+                    print(f'plates: {results["plate.well"]}')
 
     def is_registered(self):
         """Check state of compound - is it registered already?"""
