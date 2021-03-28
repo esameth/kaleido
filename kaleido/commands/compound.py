@@ -1,8 +1,8 @@
-import json
 import logging
 import argparse
 
 from kaleido.command import Command
+from kaleido.utils.files import load_file, write_file, exists
 
 #############################################################################################
 #   USE CASE                                                                                #
@@ -17,39 +17,34 @@ class CompoundCommand(Command):
     @classmethod
     def init_parser(cls, parser):
         parser.add_argument('id', type=str, help='Compound ID')
-        parser.add_argument('action', choices=['store', 'register', 'search'],
-                            help='Compound action')
+        parser.add_argument('--store', action='store_true', help="Store a compound")
+        parser.add_argument('--register', action='store_true', help="Register a compound")
+        parser.add_argument('--search', action='store_true',
+                            help="Search for a compound and its state (stored/registered)")
 
         # All compounds will be stored in a json file with its state (store or register)
         # If a file was given, load it
         # Otherwise, read or create the default file which we assume will be called compounds.json
-        parser.add_argument('--file', default='compounds.json',
+        parser.add_argument('--comp_file', default='compounds.json',
                             help='File containing compounds and state (store/register)')
+
+        # A compound can also be assigned to a plate and well
+        parser.add_argument('--assign', default=str, metavar=('plate', 'well'), nargs=2,
+                            help="Assign the compound to a plate and well")
 
     def run(self):
         """Run compound command"""
-        which_action = self._args.action
-        self.compounds = self.load_file()
+        self.compounds = load_file(self._args.comp_file)
 
-        if which_action == 'store':
+        if self._args.store:
             self.store_comp()
-            self.write_file()
-        elif which_action == 'register':
+            write_file(self._args.comp_file, self.compounds)
+        elif self._args.register:
             self.register_comp()
-            self.write_file()
-        else:
+            write_file(self._args.comp_file, self.compounds)
+        elif self._args.search:
             self.search_comp()
-
-    def load_file(self):
-        """Load json file"""
-        try:
-            return json.load(open(self._args.file, 'r+'))
-        except:
-            return {}
-
-    def write_file(self):
-        with open(self._args.file, 'w+') as f:
-            json.dump(self.compounds, f, indent=4)
+        #elif self._args.assign:
 
     def store_comp(self):
         """Store a compound"""
@@ -93,19 +88,7 @@ class CompoundCommand(Command):
     def is_registered(self):
         """Check state of compound - is it registered already?"""
         # Already stored or registered
-        if self._args.id in self.compounds:
+        if exists(self._args.id, self.compounds):
             return self.compounds[self._args.id]['state'] == 'registered'
         # Does not exist yet
         return None
-
-# class Compound(object):
-#     """Represents a compound a biologist would store/register"""
-#     def __init__(self, id, state):
-#         self._id = id
-#         self.state = state
-#
-#     @property
-#     def id(self):
-#         """Compound ID"""
-#         return self._id
-#
