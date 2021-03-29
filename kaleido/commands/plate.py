@@ -3,6 +3,7 @@ import logging
 import numpy as np
 
 from kaleido.command import Command
+from kaleido.commands.compound import CompoundCommand
 from kaleido.utils.files import load_file, write_file, exists
 
 alphabet = list(string.ascii_uppercase)
@@ -13,12 +14,12 @@ alphabet = list(string.ascii_uppercase)
 #   so that I can keep track of experiments                                                 #
 #############################################################################################
 
-class PlateCommand(Command):
+class PlateCommand(CompoundCommand):
     """Create a plate containing wells for experiments"""
 
     @classmethod
     def init_parser(cls, parser):
-        parser.add_argument('id', type=str, help='Plate ID')
+        parser.add_argument('plate_id', type=str, help='Plate ID')
         parser.add_argument('--create', metavar=('width', 'height'),
                             nargs=2, type=int, help='Create a plate with dimensions (width, height)')
         parser.add_argument('--search', action='store_true', help='Search for a plate and get all of its contents')
@@ -36,42 +37,64 @@ class PlateCommand(Command):
 
     def run(self):
         self.plates = load_file(self._args.plate_file)
-        exist = exists(self._args.id, self.plates)
+        exist = exists(self._args.plate_id, self.plates)
 
         if self._args.create:
-            if exist:
-                logging.error('Plate already exists')
-            else:
-                plate = Plate(self._args.id, self._args.create[0], self._args.create[1])
-                self.plates[plate.id] = plate.__tolist__()
-                write_file(self._args.plate_file, self.plates)
-                display(plate.plate)
+            if exist: logging.error('Plate already exists')
+            else: self.create_plate()
 
-        if self._args.search:
-            if exist:
-                display(self.plates[self._args.id])
-            else:
+        elif self._args.search:
+            if not exist:
                 logging.error('Plate does not exists')
+            else: display(self.plates[self._args.plate_id])
 
-class Plate(object):
-    def __init__(self, id, width, height):
-        self.id = id
-        # Matrix that will represent the actual plate
-        self.plate = self.create_plate(height, width)
+        elif self._args.add:
+            self.add_compound()
 
-    def create_plate(self, height, width):
-        return np.full((height, width), '-', dtype=str)
+    def create_plate(self):
+        width, height = self._args.create[0], self._args.create[1]
 
-    def __tolist__(self):
-        return self.plate.tolist()
+        plate = np.full((height, width), '-', dtype=str)
+        self.plates[self._args.plate_id] = plate.tolist()
+        write_file(self._args.plate_file, self.plates)
+        print('Successfully created the plate!')
+        display(plate)
 
-    #def add_comp(self, id):
+    def add_compound(self):
+        plate = self.plates[self._args.plate_id]
+        # Increment through all added compounds
+        for insert in self._args.add:
+            well, compound = insert[0], insert[1]
+            print(well, compound)
+            # Assumption: Cannot add a compound unless it is registered
+            # Check to see if the compound is registered first
+            #self.is_registered()
+
+            # Check to see if the well exists
+
+
+#
+# class Plate(object):
+#     def __init__(self, id, width=None, height=None, plate=None):
+#         self.id = id
+#         # Matrix that will represent the actual plate
+#         self.plate = self.create_plate(height, width) if not plate else self.load_plate()
+#
+#     def create_plate(self, height, width):
+#         return np.full((height, width), '-', dtype=str)
+#
+#     def load_plate(self):
+#         return
+#
+#     def __tolist__(self):
+#         return self.plate.tolist()
+#
+#     #def add_comp(self, id):
 
 def display(plate):
     side_str = alphabet[:len(plate)]
     well_num = list(range(1, len(plate[0]) + 1))
 
     print('\t{}'.format('\t'.join(map(str, well_num))))
-
     for i in range(len(plate)):
         print('{}\t{}'.format(side_str[i], '\t'.join(plate[i])))
