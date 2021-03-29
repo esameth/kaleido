@@ -16,7 +16,7 @@ setup(
 
         [kaleido.commands]
         compound = kaleido.commands.compound:CompoundCommand
-        plate = kaleido.commands.plate:PlateCommand
+        exp = kaleido.commands.plate:PlateCommand
     ''',
 
     test_suite='kaleido.tests',
