@@ -1,6 +1,10 @@
+import re
+import sys
+import atexit
 import string
 import logging
 import numpy as np
+from itertools import product
 
 from kaleido.command import Command
 from kaleido.commands.compound import CompoundCommand
@@ -34,22 +38,29 @@ class PlateCommand(CompoundCommand):
         parser.add_argument('--add', action='append',
                             type=lambda well_comp: well_comp.split('=', 1),
                             dest='add')
+        parser.add_argument('--well', type=str, help='Get the compound ID in the well')
 
     def run(self):
         self.plates = load_file(self._args.plate_file)
         exist = exists(self._args.plate_id, self.plates)
+        if exist: self.plate = self.plates[self._args.plate_id]
 
         if self._args.create:
-            if exist: logging.error('Plate already exists')
-            else: self.create_plate()
+            if exist:
+                sys.exit('Plate already exists')
+            self.create_plate()
 
         elif self._args.search:
             if not exist:
-                logging.error('Plate does not exists')
-            else: display(self.plates[self._args.plate_id])
+                sys.exit('Plate does not exist\n'
+                         'Create the plate by using "kaleidoo plate [plate_id] --create [num rows] [num cols]"')
+            display(self.plate)
 
         elif self._args.add:
             self.add_compound()
+
+        elif self._args.well:
+            self.get_compound()
 
     def create_plate(self):
         width, height = self._args.create[0], self._args.create[1]
@@ -68,28 +79,63 @@ class PlateCommand(CompoundCommand):
             print(well, compound)
             # Assumption: Cannot add a compound unless it is registered
             # Check to see if the compound is registered first
-            #self.is_registered()
+            print(self.is_registered(compound))
 
             # Check to see if the well exists
 
+    def get_compound(self):
+        # Split well letter (row) and number (column)
+        try:
+            row, col = re.findall('\d+|\D+', self._args.well)
+            # Convert well to location in matrix
+            row, col = alphabet.index(row), int(col) - 1
+        except:
+            sys.exit('Incorrect format: [row letter][col number]')
 
-#
-# class Plate(object):
-#     def __init__(self, id, width=None, height=None, plate=None):
-#         self.id = id
-#         # Matrix that will represent the actual plate
-#         self.plate = self.create_plate(height, width) if not plate else self.load_plate()
-#
-#     def create_plate(self, height, width):
-#         return np.full((height, width), '-', dtype=str)
-#
-#     def load_plate(self):
-#         return
-#
-#     def __tolist__(self):
-#         return self.plate.tolist()
-#
-#     #def add_comp(self, id):
+        # Check if well exists in the plate
+        plate = Plate(plate=self.plate)
+        print(plate.wells())
+        if [row, col] not in plate.avail_wells():
+            atexit.register(display, plate=self.plate)
+            sys.exit(f"Well does not exist. Available options:\n")
+
+
+#### User takes contents of a plate.well and puts it into other plate.well
+#### Request the contents of a plate.well
+
+class Plate(object):
+    def __init__(self, width=None, height=None, plate=None):
+        # Matrix that will represent the actual plate
+        if plate:
+            self.height, self.width = len(plate), len(plate[0])
+            self.make_dim()
+            self.plate = self.load_plate(plate)
+        else:
+            self.height, self.width = height, width
+            self.make_dim()
+            self.plate = self.create_plate()
+
+    def create_plate(self):
+        return np.full((self.height, self.width), '-', dtype=str)
+
+    def load_plate(self, plate):
+        return np.array(plate)
+
+    # Get well letters and numbers
+    def make_dim(self):
+        self.side_str = alphabet[:self.height]
+        self.well_num = list(map(str, range(1, self.width + 1)))
+
+    # Get all available positions
+    def wells(self):
+        all = np.array(list(product(list(range(self.height)), list(range(self.width)))))
+        print(np.argwhere(self.plate == '-'))
+        return list(map(''.join, all))
+
+    def __tolist__(self):
+        return self.plate.tolist()
+
+    #def add_comp(self, id):
 
 def display(plate):
     side_str = alphabet[:len(plate)]
