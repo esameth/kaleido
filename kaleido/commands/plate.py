@@ -1,5 +1,6 @@
 import sys
 import string
+import argparse
 
 from kaleido.plates import Plate
 from kaleido.command import Command
@@ -19,7 +20,6 @@ class PlateCommand(CompoundCommand):
 
     @classmethod
     def init_parser(cls, parser):
-        parser.add_argument('plate_id', type=str, help='Plate ID')
         # All plates will be stored in a json file with its contents
         # If a file was given, load it
         # Otherwise, read or create the default file which we assume will be called plates.json
@@ -32,70 +32,84 @@ class PlateCommand(CompoundCommand):
         # All arguments having to do with a plate
         parser_plate = subparsers.add_parser('plate', help="Search, create, or delete plates")
         parser_plate.set_defaults(which='plate')
+        parser_plate.add_argument('plate_id', type=str, help='Plate ID')
         plate_gp = parser_plate.add_mutually_exclusive_group(required=True)
         plate_gp.add_argument('--create', metavar=('width', 'height'),
                             nargs=2, type=int, help='Create a plate with dimensions (width, height)')
         plate_gp.add_argument('--search', action='store_true', help='Search for a plate and get all of its contents')
         plate_gp.add_argument('--delete', action='store_true', help='Remove a plate')
+        # Add compound to a plate
+        # Can add multiple compounds - syntax: --add well1=compound, well2=compound
+        plate_gp.add_argument('--add', action='append',
+                            type=lambda well_comp: well_comp.split('=', 1),
+                            dest='add')
 
 
         # All arguments having to do with a well
         parser_well = subparsers.add_parser('well', help="Add, search, or deletes compounds in a well")
         parser_well.set_defaults(which='well')
+        parser_well.add_argument('well_id', type=valid_plate_well, help='Well ID in the format of [Plate].[Well]')
         well_gp = parser_well.add_mutually_exclusive_group(required=True)
-        # Add compound to a plate
-        # Can add multiple compounds - syntax: --add well1=compound, well2=compound
-        well_gp.add_argument('--add', action='append',
-                            type=lambda well_comp: well_comp.split('=', 1),
-                            dest='add')
-        well_gp.add_argument('--search', type=str, help='Get the compound ID in the well')
-        well_gp.add_argument('--delete', type=str, help='Remove contents of a well')
+        # User can transfer the contents of a well into different plates/wells
+        #well_gp.add_argument('--transfer')
+        well_gp.add_argument('--search', action='store_true', help='Get the compound ID in the well')
+        well_gp.add_argument('--delete', action='store_true', help='Remove contents of a well')
 
     def run(self):
         self.plates = load_file(self._args.plate_file)
         # Check if the plate exists in the file
+        if self._args.which == 'well':
+            self._args.plate_id, self._args.well = self._args.well_id[0], self._args.well_id[1]
+
         exist = exists(self._args.plate_id, self.plates)
         # If the plate exists, get its contents
         if exist:
             self.plate = Plate(plate=self.plates[self._args.plate_id])
 
-        which_command = self._args.which
-        # All commands to do with a plate
-        if which_command == 'plate':
-            # Create a plate if it does not exist already
-            if self._args.create:
-                if exist: sys.exit('Plate already exists')
-                self.create_plate()
-
-            # Retrieve all properties of a plate if it exists
-            elif self._args.search:
-                if not exist:
-                    sys.exit('Plate does not exist\n'
-                             'Create the plate by using "kaleido plate [plate_id] --create [num rows] [num cols]"')
-                self.search_plate()
-
-            # Delete a plate if it exists
-            elif self._args.delete:
-                if not exist:
-                    sys.exit('Plate cannot be deleted because it does not exist')
-                self.del_plate()
-
         # All commands to do with a well - can only perform this if the plate exists
-        else:
+        if self._args.which == 'well':
             if not exist:
                 sys.exit('Plate does not exist\n'
                          'Create the plate by using "kaleido plate [plate_id] --create [num rows] [num cols]"')
-            # Add as many compounds as needed to a specific well
-            if self._args.add:
-                self.add_compound()
+            self.well_commands()
 
-            # Get the contents of a well
-            elif self._args.search:
-                self.get_compound()
+        # All commands to do with a plate
+        else:
+            self.plate_commands(exist)
 
-            # Delete the contents of a well
-            elif self._args.delete:
-                self.del_well()
+
+    def plate_commands(self, exist):
+        # Create a plate if it does not exist already
+        if self._args.create:
+            if exist: sys.exit('Plate already exists')
+            self.create_plate()
+
+        # Retrieve all properties of a plate if it exists
+        elif self._args.search:
+            if not exist:
+                sys.exit('Plate does not exist\n'
+                         'Create the plate by using "kaleido plate [plate_id] --create [num rows] [num cols]"')
+            self.search_plate()
+
+        # Delete a plate if it exists
+        elif self._args.delete:
+            if not exist:
+                sys.exit('Plate cannot be deleted because it does not exist')
+            self.del_plate()
+
+    def well_commands(self):
+        # Add as many compounds as needed to a specific well
+        #if self._args.add:
+        #    self.add_compound()
+
+        # Get the contents of a well
+        if self._args.search:
+            self.get_compound()
+
+        # Delete the contents of a well
+        elif self._args.delete:
+            self.del_well()
+
 
     def create_plate(self):
         # Create a plate
@@ -137,25 +151,32 @@ class PlateCommand(CompoundCommand):
 
     def get_compound(self):
         # Check formatting
-        self.plate.check_well_format(self._args.search)
+        self.plate.check_well_format(self._args.well)
         # Check if well exists (and has a compound) in the plate
         taken_wells = self.plate.wells
-        if self._args.search in taken_wells:
-            print(f'Compound {taken_wells[self._args.search]} is in {self._args.plate_id}.{self._args.search}')
+        if self._args.well in taken_wells:
+            print(f'Compound {taken_wells[self._args.well]} is in {".".join(self._args.well_id)}')
         else:
-            print(f'There is no compound in {self._args.plate_id}.{self._args.search}')
+            print(f'There is no compound in {".".join(self._args.well_id)}')
 
     def del_well(self):
         # Check formatting
-        self.plate.check_well_format(self._args.delete)
-        if self._args.delete in self.plate.wells:
-            self.plate.del_well(self._args.delete)
+        self.plate.check_well_format(self._args.well)
+        if self._args.well in self.plate.wells:
+            self.plate.del_well(self._args.well)
             self.plates[self._args.plate_id]['plate'] = self.plate.wells
             write_file(self._args.plate_file, self.plates)
-            print(f'Successfully removed the contents of {self._args.plate_id}.{self._args.delete}!')
+            print(f'Successfully removed the contents of {".".join(self._args.well_id)}!')
             display(self.plate)
         else:
-            print(f'There is no compound in {self._args.plate_id}.{self._args.delete}')
+            print(f'There is no compound in {".".join(self._args.well_id)}')
+
+def valid_plate_well(plate_well):
+    # Well ID can only be of length 2: [[plate], [well]]
+    value = list(filter(None, plate_well.split('.')))
+    if len(value) == 2:
+        return value[0], value[1]
+    raise argparse.ArgumentTypeError("Well ID must be in the format of [plate].[well]")
 
 def display(plate):
     side_str = alphabet[:plate.height]
