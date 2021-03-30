@@ -1,5 +1,6 @@
 import sys
 import string
+import logging
 import argparse
 
 from kaleido.plates import Plate
@@ -15,7 +16,7 @@ alphabet = list(string.ascii_uppercase)
 #   so that I can keep track of experiments                                                 #
 #############################################################################################
 
-class PlateCommand(CompoundCommand):
+class PlateCommand(Command):
     """Perform actions on a plate and its wells"""
 
     @classmethod
@@ -26,6 +27,11 @@ class PlateCommand(CompoundCommand):
         # This file will contain id: {width, height, {filled wells}}
         parser.add_argument('--plate_file', default='plates.json',
                             help='File containing plates and their contents')
+        # All compounds will be stored in a json file with its state (store or register)
+        # If a file was given, load it
+        # Otherwise, read or create the default file which we assume will be called compounds.json
+        parser.add_argument('--comp_file', default='compounds.json',
+                            help='File containing compounds and state (store/register)')
 
         subparsers = parser.add_subparsers(help='Sub-Command Help', dest='which', required=True)
 
@@ -64,7 +70,7 @@ class PlateCommand(CompoundCommand):
         exist = exists(self._args.plate_id, self.plates)
         # If the plate exists, get its contents
         if exist:
-            self.plate = Plate(plate=self.plates[self._args.plate_id])
+            self.plate = Plate(self._args.plate_id, plate=self.plates[self._args.plate_id])
 
         # All commands to do with a well - can only perform this if the plate exists
         if self._args.which == 'well':
@@ -77,7 +83,6 @@ class PlateCommand(CompoundCommand):
         else:
             self.plate_commands(exist)
 
-
     def plate_commands(self, exist):
         # Create a plate if it does not exist already
         if self._args.create:
@@ -86,22 +91,21 @@ class PlateCommand(CompoundCommand):
 
         # Retrieve all properties of a plate if it exists
         elif self._args.search:
-            if not exist:
-                sys.exit('Plate does not exist\n'
-                         'Create the plate by using "kaleido plate [plate_id] --create [num rows] [num cols]"')
+            exist_error(exist)
             self.search_plate()
 
         # Delete a plate if it exists
         elif self._args.delete:
-            if not exist:
-                sys.exit('Plate cannot be deleted because it does not exist')
+            exist_error(exist)
             self.del_plate()
 
-    def well_commands(self):
-        # Add as many compounds as needed to a specific well
-        #if self._args.add:
-        #    self.add_compound()
+        # Add compounds to the plate at a specified well
+        else:
+            exist_error(exist)
+            self.add_compound()
 
+
+    def well_commands(self):
         # Get the contents of a well
         if self._args.search:
             self.get_compound()
@@ -110,10 +114,12 @@ class PlateCommand(CompoundCommand):
         elif self._args.delete:
             self.del_well()
 
+        else:
+            self.compounds = load_file(self._args.comp_file)
 
     def create_plate(self):
         # Create a plate
-        plate = Plate(self._args.create[0], self._args.create[1])
+        plate = Plate(self._args.plate_id, self._args.create[0], self._args.create[1])
         self.plates[self._args.plate_id] = plate.__todict__()
         # Write the plate to a file
         write_file(self._args.plate_file, self.plates)
@@ -122,32 +128,36 @@ class PlateCommand(CompoundCommand):
         display(plate)
 
     def search_plate(self):
-        print(f'Plate ID:\t{self._args.plate_id}')
-        print(f'Num. rows:\t{self.plate.height}')
-        print(f'Num. cols:\t{self.plate.width}\n')
         display(self.plate)
 
     def del_plate(self):
-        removed_plate = Plate(plate=self.plates.pop(self._args.plate_id))
+        removed_plate = Plate(self._args.plate_id, plate=self.plates.pop(self._args.plate_id))
         write_file(self._args.plate_file, self.plates)
         print('Successfully removed the plate!')
-        print(f'Plate ID:\t{self._args.plate_id}')
-        print(f'Num. rows:\t{removed_plate.height}')
-        print(f'Num. cols:\t{removed_plate.width}\n')
         if removed_plate.wells:
             display(removed_plate)
-
 
     def add_compound(self):
         # Increment through all added compounds
         for insert in self._args.add:
             well, compound = insert[0], insert[1]
-            print(well, compound)
+            # Check if it is a valid well
+            self.plate.check_well_format(well)
+            # Check if well is already taken
+            if well in self.plate.wells:
+                logging.warning(f'{well} already has a compound in it and will be skipped. '
+                                f'To delete the contents of this well use:\n'
+                                f'kaleido exp well {well} --delete')
+                pass
             # Assumption: Cannot add a compound unless it is registered
             # Check to see if the compound is registered first
-            #print(self.is_registered(compound))
-
-            # Check to see if the well exists
+            exist = exists(compound, self.compounds)
+            if not exist or (exist and self.compounds[compound]['state'] == 'stored'):
+                logging.warning(f'{compound} is not registered and will be skipped. '
+                                f'To register this compound use:\n'
+                                f'kaleido compound {compound} --register')
+                pass
+            
 
     def get_compound(self):
         # Check formatting
@@ -178,7 +188,16 @@ def valid_plate_well(plate_well):
         return value[0], value[1]
     raise argparse.ArgumentTypeError("Well ID must be in the format of [plate].[well]")
 
+def exist_error(exist):
+    if not exist:
+        sys.exit('Plate does not exist\n'
+                 'Create the plate by using "kaleido exp plate [plate_id] --create [num rows] [num cols]"')
+
 def display(plate):
+    print(f'Plate ID:\t{plate._id}')
+    print(f'Num. rows:\t{plate.height}')
+    print(f'Num. cols:\t{plate.width}\n')
+
     side_str = alphabet[:plate.height]
     well_num = list(range(1, plate.width + 1))
 

@@ -8,7 +8,8 @@ alphabet = list(string.ascii_uppercase)
 
 class Plate(object):
     """Represents a plate a biologist would create"""
-    def __init__(self, height=None, width=None, plate=None):
+    def __init__(self, id, height=None, width=None, plate=None):
+        self._id = id
         if plate:
             self.load_plate(plate)
         else:
