@@ -62,7 +62,10 @@ class PlateCommand(Command):
         well_gp.add_argument('--delete', action='store_true', help='Remove contents of a well')
 
     def run(self):
+        # Load all files
         self.plates = load_file(self._args.plate_file)
+        self.compounds = load_file(self._args.comp_file)
+
         # Check if the plate exists in the file
         if self._args.which == 'well':
             self._args.plate_id, self._args.well = self._args.well_id[0], self._args.well_id[1]
@@ -141,23 +144,34 @@ class PlateCommand(Command):
         # Increment through all added compounds
         for insert in self._args.add:
             well, compound = insert[0], insert[1]
-            # Check if it is a valid well
-            self.plate.check_well_format(well)
+
+            # # Check if it is a valid well
+            # row, col = self.plate.check_well_format(well)
             # Check if well is already taken
             if well in self.plate.wells:
                 logging.warning(f'{well} already has a compound in it and will be skipped. '
                                 f'To delete the contents of this well use:\n'
-                                f'kaleido exp well {well} --delete')
-                pass
+                                f'kaleido exp well {well} --delete\n')
+                continue
             # Assumption: Cannot add a compound unless it is registered
             # Check to see if the compound is registered first
             exist = exists(compound, self.compounds)
             if not exist or (exist and self.compounds[compound]['state'] == 'stored'):
                 logging.warning(f'{compound} is not registered and will be skipped. '
                                 f'To register this compound use:\n'
-                                f'kaleido compound {compound} --register')
-                pass
-            
+                                f'kaleido compound {compound} --register\n')
+                continue
+
+            self.plate.add_comp(well, compound)
+            self.compounds[compound]['plate.well'].append(f'{self._args.plate_id}.{well}')
+            print(f'Successfully added {compound} to {self._args.plate_id}.{well}\n')
+
+        self.plates[self.plate._id] = self.plate.__todict__()
+        # Write the plate to a file
+        write_file(self._args.plate_file, self.plates)
+        write_file(self._args.comp_file, self.compounds)
+        display(self.plate)
+
 
     def get_compound(self):
         # Check formatting

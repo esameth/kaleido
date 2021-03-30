@@ -47,12 +47,19 @@ class Plate(object):
             # Convert well to location in matrix
             row, col = alphabet.index(row), int(col) - 1
         except:
-            sys.exit('Incorrect format: [row letter][col number]')
+            sys.exit(f'{well} is in the incorrect format.\n'
+                     f'Correct format: [row letter][col number]')
         # Check that it is a well in the plate
         if row >= self.height or col >= self.width:
             sys.exit(f'Well should be a letter up to {alphabet[self.height - 1]} '
                      f'and a number up to {self.width}')
         return row, col
+
+    # Add compound to position
+    def add_comp(self, well, comp):
+        row, col = self.check_well_format(well)
+        self.plate[row][col] = comp
+        self.wells[well] = comp
 
     # Return all of the properties of a plate
     def __todict__(self):
