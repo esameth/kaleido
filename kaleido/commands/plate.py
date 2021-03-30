@@ -71,7 +71,7 @@ class PlateCommand(CompoundCommand):
                 if not exist:
                     sys.exit('Plate does not exist\n'
                              'Create the plate by using "kaleidoo plate [plate_id] --create [num rows] [num cols]"')
-                display(self.plate)
+                self.search_plate()
 
             elif self._args.delete:
                 if not exist:
@@ -102,9 +102,27 @@ class PlateCommand(CompoundCommand):
         # Display the empty plate
         display(plate)
 
+    def search_plate(self):
+        # Create a plate
+        plate = Plate(plate=self.plate)
+        print(f'Plate ID:\t{self._args.plate_id}')
+        print(f'Num. rows:\t{plate.height}')
+        print(f'Num. cols:\t{plate.width}\n')
+        display(plate)
+
+    def del_plate(self):
+        removed_plate = Plate(plate=self.plates.pop(self._args.plate_id))
+        write_file(self._args.plate_file, self.plates)
+        print('Successfully removed the plate!')
+        print(f'Plate ID:\t{self._args.plate_id}')
+        print(f'Num. rows:\t{removed_plate.height}')
+        print(f'Num. cols:\t{removed_plate.width}\n')
+        if removed_plate.wells:
+            display(removed_plate)
+
+
     def add_compound(self):
-        load_plate = self.plates[self._args.plate_id]
-        plate = Plate(plate=load_plate)
+        plate = Plate(plate=self.plate)
         # Increment through all added compounds
         for insert in self._args.add:
             well, compound = insert[0], insert[1]
@@ -115,61 +133,50 @@ class PlateCommand(CompoundCommand):
 
             # Check to see if the well exists
 
-
     def get_compound(self):
         # Check formatting
-        check_well_format(self._args.well)
+        check_well_format(self._args.search)
         # Check if well exists in the plate
-        taken_wells = self.plates[self._args.plate_id]['plate']
-        if self._args.well in taken_wells:
-            print(f'Compound {taken_wells[self._args.well]} is in {self._args.plate_id}.{self._args.well}')
+        taken_wells = self.plate['plate']
+        if self._args.search in taken_wells:
+            print(f'Compound {taken_wells[self._args.search]} is in {self._args.plate_id}.{self._args.search}')
         else:
-            print(f'There is no compound in {self._args.plate_id}.{self._args.well}')
-
-    def del_plate(self):
-        removed_val = self.plates.pop(self._args.plate_id)
-        write_file(self._args.plate_file, self.plates)
-        print('Successfully removed the plate!')
-        print(f'Plate ID:\t{self._args.plate_id}')
-        print(f'Num. rows:\t{removed_val["height"]}')
-        print(f'Num. cols:\t{removed_val["width"]}')
-        # if removed_val['plate']:
-        #     print(f)
+            print(f'There is no compound in {self._args.plate_id}.{self._args.search}')
 
     def del_well(self):
         # Check formatting
-        check_well_format(self._args.delete_well)
-        taken_wells = self.plates[self._args.plate_id]['plate']
-        print(self.plates)
-        print(taken_wells)
-        if self._args.delete_well in taken_wells:
-            del self.plates[self._args.plate_id]['plate'][self._args.delete_well]
+        check_well_format(self._args.delete)
+        # Create a plate
+        plate = Plate(plate=self.plate)
+        if self._args.delete in plate.wells:
+            plate.del_well(self._args.delete)
+            self.plates[self._args.plate_id]['plate'] = plate.wells
             write_file(self._args.plate_file, self.plates)
-            print(f'Successfully removed the contents of {self._args.plate_id}.{self._args.delete_well}!')
+            print(f'Successfully removed the contents of {self._args.plate_id}.{self._args.delete}!')
+            display(plate)
         else:
-            print(f'There is no compound in {self._args.plate_id}.{self._args.delete_well}')
+            print(f'There is no compound in {self._args.plate_id}.{self._args.delete}')
+
 
 def check_well_format(well):
     # Split well letter (row) and number (column)
     try:
         row, col = re.findall('\d+|\D+', well)
         # Convert well to location in matrix
-        row, col = alphabet.index(row), int(col) - 1
+        return alphabet.index(row), int(col) - 1
     except:
         sys.exit('Incorrect format: [row letter][col number]')
 
+#### Add compound to plate
 #### User takes contents of a plate.well and puts it into other plate.well
-#### Request the contents of a plate.well
-#### Delete well
 
 class Plate(object):
-    def __init__(self, width=None, height=None, plate=None):
+    def __init__(self, height=None, width=None, plate=None):
         # Matrix that will represent the actual plate
         if plate:
             self.load_plate(plate)
         else:
             self.height, self.width = height, width
-            # self.make_dim()
             self.create_plate()
 
     def create_plate(self):
@@ -181,13 +188,22 @@ class Plate(object):
         self.width = plate['width']
         self.height = plate['height']
         self.wells = plate['plate']
-        self.plate =
+        self.plate = np.full((self.height, self.width), '-', dtype=str)
+
+        for well, comp in self.wells.items():
+            row, col = check_well_format(well)
+            self.plate[row][col] = comp
 
     # Get all available positions
     def avail_wells(self):
         all = np.array(list(product(list(range(self.height)), list(range(self.width)))))
-        print(np.argwhere(self.plate == '-'))
         return list(map(''.join, all))
+
+    # Remove a well
+    def del_well(self, well):
+        self.wells.pop(well)
+        row, col = check_well_format(well)
+        self.plate[row][col] = '-'
 
     def __todict__(self):
         return {'width': self.width, 'height': self.height, 'plate': self.wells}
