@@ -1,5 +1,6 @@
 import sys
 
+from kaleido.plates import Plate
 from kaleido.compounds import Compound
 from kaleido.commands.well import del_well, valid_plate_well
 from kaleido.command import Command, FileCommand
@@ -85,7 +86,7 @@ class CompoundCommand(FileCommand, Command):
         # Remove the plate.well the compound is in
         for remove in self.comp.plate:
             plate, well = valid_plate_well(remove)
-            del_well(self._args.plate_file, self.plates, plate, well)
+            del_well(self._args.plate_file, self.plates, Plate(plate, plate=self.plates[plate]), well)
         # Remove from compound file
         del self.compounds[self.comp._id]
         write_file(self._args.comp_file, self.compounds)
