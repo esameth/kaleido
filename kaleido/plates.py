@@ -22,14 +22,14 @@ class Plate(object):
     def create_plate(self):
         """Create an empty plate"""
         self.wells = {}
-        self.plate = np.full((self.height, self.width), '-', dtype=str)
+        self.plate = np.full((self.height, self.width), '-', dtype=object)
 
     def load_plate(self, plate):
         """Load an already created plate"""
         self.width = plate['width']
         self.height = plate['height']
         self.wells = plate['plate']
-        self.plate = np.full((self.height, self.width), '-', dtype=str)
+        self.plate = np.full((self.height, self.width), '-', dtype=object)
 
         # Populate plate with compounds
         for well, comp in self.wells.items():
@@ -39,7 +39,7 @@ class Plate(object):
     def del_well(self, well):
         """Remove the contents of a well in a plate"""
         self.wells.pop(well)
-        row, col = self.check_well_format(well)
+        row, col, OK = self.check_well_format(well)
         self.plate[row][col] = '-'
 
     def check_well_format(self, well, exit=True):

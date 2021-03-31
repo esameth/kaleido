@@ -12,6 +12,9 @@ class Compound(object):
         self.state = props['state']
         self.plate = props['plate.well']
 
+    def delete_well(self, well):
+        self.plate.remove(well)
+
     # Return all of the properties of a compound
     def __todict__(self):
         return {'state': self.state, 'plate.well': self.plate}

@@ -2,6 +2,7 @@ import sys
 import argparse
 
 from kaleido.plates import Plate
+from kaleido.compounds import Compound
 from kaleido.command import Command, FileCommand
 from kaleido.utils.util import warning, display, write_file, exists
 
@@ -59,7 +60,7 @@ class WellCommand(FileCommand, Command):
                 print(f'There is no compound in {".".join(self._args.well_id)}')
 
         elif self._args.delete:
-            del_well(self._args.plate_file, self.plates, self.plate, self._args.well)
+            self.delete_well()
         elif self._args.transfer:
             self.transfer_well()
         else:
@@ -130,6 +131,19 @@ class WellCommand(FileCommand, Command):
         write_file(self._args.comp_file, self.compounds)
         display(self.plate)
 
+    def delete_well(self):
+        """Delete the contents of a well"""
+        # Get the contents of the well
+        compound = self.get_compound()
+        # Remove from plate
+        del_well(self._args.plate_file, self.plates, self.plate, self._args.well)
+        # Remove plate.wells from compound file
+        compound_obj = Compound(compound, props=self.compounds[compound])
+        compound_obj.delete_well(".".join([self.plate._id, self._args.well]))
+        self.compounds[compound] = compound_obj.__todict__()
+        write_file(self._args.comp_file, self.compounds)
+
+
 def valid_plate_well(plate_well):
     """Check that the input is in the format plate.well"""
     # Well ID can only be of length 2: [[plate], [well]]
@@ -143,9 +157,10 @@ def del_well(file, plates, plate, well):
     # Check formatting
     plate.check_well_format(well)
     if well in plate.wells:
+        # Remove compound from plate
         plate.del_well(well)
         plates[plate._id]['plate'] = plate.wells
         write_file(file, plates)
         print(f'Successfully removed the contents of {".".join([plate._id, well])}!')
     else:
-        print(f'There is no compound in {".".join([plate._id, well])}')
+        sys.exit(f'There is no compound in {".".join([plate._id, well])}')

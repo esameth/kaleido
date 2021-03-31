@@ -89,8 +89,6 @@ class PlateCommand(FileCommand, Command):
         # Increment through all added compounds
         for insert in self._args.add:
             well, compound = insert[0], insert[1]
-            # Check if it is a valid well
-            self.plate.check_well_format(well, False)
 
             # Check if well is already taken
             if well in self.plate.wells:
@@ -105,7 +103,10 @@ class PlateCommand(FileCommand, Command):
                         f'To register this compound use "kaleido compound {compound} --register"\n')
                 continue
 
-            self.plate.add_comp(well, compound)
+            # Add compound to well
+            if not self.plate.add_comp(well, compound):
+                continue
+
             self.compounds[compound]['plate.well'].append(f'{self.plate._id}.{well}')
             print(f'Successfully added {compound} to {self.plate._id}.{well}\n')
 
