@@ -99,7 +99,7 @@ do so using `--add`. This takes as many inputs as needed in the format
 
 **NOTE: Only registered compounds may be added to a plate**  
 
-###`well` Command
+### `well` Command
 The `well` command allows you to search or delete the given well,
 add a compound to that well, or transfer the contents of that well to 
 other wells. This is done using `kaleido well [Well ID]` with any of the 
