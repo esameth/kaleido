@@ -16,13 +16,13 @@ class Plate(object):
             self.height, self.width = height, width
             self.create_plate()
 
-    # Create an empty plate
     def create_plate(self):
+        """Create an empty plate"""
         self.wells = {}
         self.plate = np.full((self.height, self.width), '-', dtype=str)
 
-    # Load an already created plate
     def load_plate(self, plate):
+        """Load an already created plate"""
         self.width = plate['width']
         self.height = plate['height']
         self.wells = plate['plate']
@@ -33,14 +33,14 @@ class Plate(object):
             row, col = self.check_well_format(well)
             self.plate[row][col] = comp
 
-    # Remove the contents of a well in a plate
     def del_well(self, well):
+        """Remove the contents of a well in a plate"""
         self.wells.pop(well)
         row, col = self.check_well_format(well)
         self.plate[row][col] = '-'
 
-    # Check that the well is in the correct format [letter][num] and it's in a well in the plate
     def check_well_format(self, well):
+        """Check that the well is in the correct format [letter][num] and it's in a well in the plate"""
         # Split well letter (row) and number (column)
         try:
             row, col = re.findall('\d+|\D+', well)
@@ -55,8 +55,8 @@ class Plate(object):
                      f'and a number up to {self.width}')
         return row, col
 
-    # Add compound to position
     def add_comp(self, well, comp):
+        """Add compound to position"""
         row, col = self.check_well_format(well)
         self.plate[row][col] = comp
         self.wells[well] = comp

@@ -2,9 +2,8 @@ import sys
 import logging
 import argparse
 
-from kaleido.command import Command
 from kaleido.compounds import Compound
-from kaleido.utils.files import load_file, write_file, exists
+from kaleido.command import Command, FileCommand
 
 #############################################################################################
 #   USE CASE                                                                                #
@@ -13,7 +12,7 @@ from kaleido.utils.files import load_file, write_file, exists
 #   so that I can store/register a compound                                                 #
 #############################################################################################
 
-class CompoundCommand(Command):
+class CompoundCommand(FileCommand, Command):
     """Store or register a compound, or search for all wells associated with a compound"""
 
     @classmethod
@@ -22,25 +21,22 @@ class CompoundCommand(Command):
         parser.add_argument('--store', action='store_true', help="Store a compound")
         parser.add_argument('--register', action='store_true', help="Register a compound")
         parser.add_argument('--search', action='store_true',
-                            help="Search for a compound and its state (stored/registered)")
+                            help="Search for a compound, its state (stored/registered), and all plates it is in")
+        parser.add_argument('--delete', action='store_true', help='Remove a compound')
 
-        # All compounds will be stored in a json file with its state (store or register)
-        # If a file was given, load it
-        # Otherwise, read or create the default file which we assume will be called compounds.json
-        parser.add_argument('--comp_file', default='compounds.json',
-                            help='File containing compounds and state (store/register)')
+        super(CompoundCommand, cls).init_parser(parser)
 
     def run(self):
         """Run compound command"""
-        self.compounds = load_file(self._args.comp_file)
+        self.load_file()
         self.comp = self.load_comp()
 
         if self._args.store:
             self.store_comp()
-            write_file(self._args.comp_file, self.compounds)
+            self.write_file(self._args.comp_file, self.compounds)
         elif self._args.register:
             self.register_comp()
-            write_file(self._args.comp_file, self.compounds)
+            self.write_file(self._args.comp_file, self.compounds)
         elif self._args.search:
             self.search_comp()
 
@@ -73,12 +69,20 @@ class CompoundCommand(Command):
         if not self.comp:
             print(f'Compound {self._args.id} does not exist')
         else:
-            print(f'id: {self.comp._id}')
-            print(f'state: {self.comp.state}')
+            print(f'Compound id: {self.comp._id}')
+            print(f'State: {self.comp.state}\n')
             if self.comp.plate:
-                print('plates: {}'.format("\t".join(self.comp.plate)))
+                print('Associated plates and wells: \n{}'.format('\n'.join(self.comp.plate)))
+
+    def delete_comp(self):
+        """Delete a compound if it exists"""
+        # Give error if does not exist
+        if not self.comp:
+            sys.exit(f'Compound {self._args.id} does not exist')
+
+        print(f'Successfully deleted {self._args.id}')
 
     def load_comp(self):
         # Already stored or registered
-        if exists(self._args.id, self.compounds):
+        if self.exists(self._args.id, self.compounds):
             return Compound(self._args.id, props=self.compounds[self._args.id])

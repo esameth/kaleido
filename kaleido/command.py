@@ -1,5 +1,5 @@
 # Contains all information for a command
-
+import json
 import argparse
 import logging
 import pkg_resources
@@ -35,6 +35,45 @@ class Command(object):
         if exc is not None:
             logger.debug('Command failed due to an exception!', exc_info=exc)
         sys.exit(1)
+
+class FileCommand(object):
+    """Commands for plate and compound file handling"""
+
+    @classmethod
+    def init_parser(cls, parser):
+        # All plates will be stored in a json file with its contents
+        # If a file was given, load it
+        # Otherwise, read or create the default file which we assume will be called plates.json
+        # This file will contain id: {width, height, {filled wells}}
+        parser.add_argument('--plate_file', default='plates.json',
+                            help='File containing plates and their contents')
+        # All compounds will be stored in a json file with its state (store or register)
+        # If a file was given, load it
+        # Otherwise, read or create the default file which we assume will be called compounds.json
+        parser.add_argument('--comp_file', default='compounds.json',
+                            help='File containing compounds and state (store/register)')
+        super(FileCommand, cls).init_parser(parser)
+
+    def load_file(self):
+        """Load all files"""
+        self.plates = self.load(self._args.plate_file)
+        self.compounds = self.load(self._args.comp_file)
+
+    def load(self, file):
+        """Load json file"""
+        try:
+            return json.load(open(file, 'r+'))
+        except:
+            return {}
+
+    def write_file(self, file, dict):
+        with open(file, 'w+') as f:
+            json.dump(dict, f, indent=4)
+
+    def exists(self, search, dict):
+        """Check if compound or plate is in the file"""
+        return search in dict
+
 
 def main(command_class=None, args=None):
     """Run the command line with the given command"""
