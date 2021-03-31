@@ -66,15 +66,6 @@ class FileCommand(object):
         except:
             return {}
 
-    def write_file(self, file, dict):
-        with open(file, 'w+') as f:
-            json.dump(dict, f, indent=4)
-
-    def exists(self, search, dict):
-        """Check if compound or plate is in the file"""
-        return search in dict
-
-
 def main(command_class=None, args=None):
     """Run the command line with the given command"""
 

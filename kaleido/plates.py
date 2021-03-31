@@ -1,8 +1,11 @@
 import re
 import sys
 import string
+import logging
 import numpy as np
 from itertools import product
+
+from kaleido.utils.util import warning
 
 alphabet = list(string.ascii_uppercase)
 
@@ -30,7 +33,7 @@ class Plate(object):
 
         # Populate plate with compounds
         for well, comp in self.wells.items():
-            row, col = self.check_well_format(well)
+            row, col, OK = self.check_well_format(well)
             self.plate[row][col] = comp
 
     def del_well(self, well):
@@ -39,27 +42,33 @@ class Plate(object):
         row, col = self.check_well_format(well)
         self.plate[row][col] = '-'
 
-    def check_well_format(self, well):
+    def check_well_format(self, well, exit=True):
         """Check that the well is in the correct format [letter][num] and it's in a well in the plate"""
         # Split well letter (row) and number (column)
+        OK = True
         try:
             row, col = re.findall('\d+|\D+', well)
             # Convert well to location in matrix
             row, col = alphabet.index(row), int(col) - 1
         except:
-            sys.exit(f'{well} is in the incorrect format.\n'
-                     f'Correct format: [row letter][col number]')
+            warning(f'{well} is in the incorrect format.\n'
+                    f'Correct format: [row letter][col number]', exit)
+            OK = False
         # Check that it is a well in the plate
         if row >= self.height or col >= self.width:
-            sys.exit(f'Well should be a letter up to {alphabet[self.height - 1]} '
-                     f'and a number up to {self.width}')
-        return row, col
+            warning(f'{well} should be a letter up to {alphabet[self.height - 1]} '
+                    f'and a number up to {self.width}', exit)
+            OK = False
+        return row, col, OK
 
-    def add_comp(self, well, comp):
+    def add_comp(self, well, comp, exit=False):
         """Add compound to position"""
-        row, col = self.check_well_format(well)
-        self.plate[row][col] = comp
-        self.wells[well] = comp
+        row, col, OK = self.check_well_format(well, exit)
+        if OK:
+            self.plate[row][col] = comp
+            self.wells[well] = comp
+            return True
+        return False
 
     # Return all of the properties of a plate
     def __todict__(self):

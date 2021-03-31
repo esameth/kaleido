@@ -1,9 +1,9 @@
 import sys
-import logging
-import argparse
 
 from kaleido.compounds import Compound
+from kaleido.commands.well import del_well, valid_plate_well
 from kaleido.command import Command, FileCommand
+from kaleido.utils.util import write_file, exists
 
 #############################################################################################
 #   USE CASE                                                                                #
@@ -13,7 +13,7 @@ from kaleido.command import Command, FileCommand
 #############################################################################################
 
 class CompoundCommand(FileCommand, Command):
-    """Store or register a compound, or search for all wells associated with a compound"""
+    """Store/register a compound, or search/delete all plate.wells associated with a compound"""
 
     @classmethod
     def init_parser(cls, parser):
@@ -33,12 +33,14 @@ class CompoundCommand(FileCommand, Command):
 
         if self._args.store:
             self.store_comp()
-            self.write_file(self._args.comp_file, self.compounds)
+            write_file(self._args.comp_file, self.compounds)
         elif self._args.register:
             self.register_comp()
-            self.write_file(self._args.comp_file, self.compounds)
+            write_file(self._args.comp_file, self.compounds)
         elif self._args.search:
             self.search_comp()
+        else:
+            self.delete_comp()
 
     def store_comp(self):
         """Store a compound"""
@@ -76,13 +78,20 @@ class CompoundCommand(FileCommand, Command):
 
     def delete_comp(self):
         """Delete a compound if it exists"""
-        # Give error if does not exist
+        # Give error if the compound does not exist
         if not self.comp:
             sys.exit(f'Compound {self._args.id} does not exist')
 
+        # Remove the plate.well the compound is in
+        for remove in self.comp.plate:
+            plate, well = valid_plate_well(remove)
+            del_well(self._args.plate_file, self.plates, plate, well)
+        # Remove from compound file
+        del self.compounds[self.comp._id]
+        write_file(self._args.comp_file, self.compounds)
         print(f'Successfully deleted {self._args.id}')
 
     def load_comp(self):
         # Already stored or registered
-        if self.exists(self._args.id, self.compounds):
+        if exists(self._args.id, self.compounds):
             return Compound(self._args.id, props=self.compounds[self._args.id])
